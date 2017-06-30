@@ -8,7 +8,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"sync"
 	"time"
 )
 
@@ -110,8 +109,7 @@ func notify(a ArrivalDepartures) {
 	msg.Push()
 }
 
-func searchAndNotify(apiKey, stopId, routeId string, signal *sync.WaitGroup) {
-	defer signal.Done()
+func searchAndNotify(apiKey, stopId, routeId string) {
 	arr, _ := getTimesForRouteAtStop(apiKey, stopId, routeId)
 	for _, a := range arr {
 		notify(a)
@@ -121,11 +119,11 @@ func searchAndNotify(apiKey, stopId, routeId string, signal *sync.WaitGroup) {
 //Calls arrivals and departures parses the data
 //find the route in it and then printout the time
 func main() {
-	var signal sync.WaitGroup
-	signal.Add(2)
 	apiKey := os.Getenv("SOUND_TRANSIT_KEY")
-	go searchAndNotify(apiKey, stopId4thAndUniv, routeId76, &signal)
-	go searchAndNotify(apiKey, stopId4thAndUniv, "1_100069", &signal)
-	go searchAndNotify(apiKey, stopId4thAndUniv, routeId316, &signal)
-	signal.Wait()
+	for {
+		go searchAndNotify(apiKey, stopId4thAndUniv, routeId76)
+		go searchAndNotify(apiKey, stopId4thAndUniv, "1_100069")
+		go searchAndNotify(apiKey, stopId4thAndUniv, routeId316)
+		time.Sleep(5 * time.Minute)
+	}
 }
