@@ -1,4 +1,4 @@
-package gosoundtransit
+package main
 
 import (
 	"encoding/json"
@@ -105,7 +105,7 @@ func (a *ArrivalDepartures) String() string {
 func notify(a ArrivalDepartures) {
 	fmt.Println(a.String())
 	msg := gosxnotifier.NewNotification(a.String())
-	msg.Title = "Bus notification " + a.RouteShortName
+	msg.Title = "Bus " + a.RouteShortName
 	msg.Group = "com.eginez.go.bus.notifier"
 	msg.Push()
 }
