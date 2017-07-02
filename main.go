@@ -3,12 +3,13 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/deckarep/gosx-notifier"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/deckarep/gosx-notifier"
 )
 
 const endpoint = "http://api.pugetsound.onebusaway.org"
@@ -18,6 +19,13 @@ const routeId76 = "1_100270"
 
 const stopId4thAndUniv = "1_682"
 const stopId6thAndPike = "1_1190"
+const timeToMonitor = time.Minute * 60
+const frequencyToMonitor = time.Minute * 5
+
+var StopsToMonitor = map[string][]string{
+	stopId4thAndUniv: {routeId76, routeId316},
+	stopId6thAndPike: {routeId76, routeId316},
+}
 
 type ArrivalDepartures struct {
 	ArrivalEnabled             bool          `json:"arrivalEnabled"`
@@ -63,6 +71,9 @@ func httpCall(url string) (data []byte, err error) {
 	log.Println("HTTP GET to ", url)
 	var res *http.Response
 	res, err = http.Get(url)
+	if err != nil {
+		return
+	}
 	defer res.Body.Close()
 	return ioutil.ReadAll(res.Body)
 }
@@ -105,7 +116,7 @@ func notify(a ArrivalDepartures) {
 	fmt.Println(a.String())
 	msg := gosxnotifier.NewNotification(a.String())
 	msg.Title = "Bus " + a.RouteShortName
-	msg.Group = "com.eginez.go.bus.notifier"
+	msg.Group = "com.eginez.go.bus.notifier.bus" + a.RouteShortName
 	msg.Push()
 }
 
@@ -120,10 +131,21 @@ func searchAndNotify(apiKey, stopId, routeId string) {
 //find the route in it and then printout the time
 func main() {
 	apiKey := os.Getenv("SOUND_TRANSIT_KEY")
+	startTime := time.Now()
 	for {
-		go searchAndNotify(apiKey, stopId4thAndUniv, routeId76)
-		go searchAndNotify(apiKey, stopId4thAndUniv, "1_100069")
-		go searchAndNotify(apiKey, stopId4thAndUniv, routeId316)
-		time.Sleep(5 * time.Minute)
+		for k, v := range StopsToMonitor {
+			for _, r := range v {
+				fmt.Println(k, r)
+				go searchAndNotify(apiKey, k, r)
+				//	go searchAndNotify(apiKey, stopId4thAndUniv, "1_100069")
+			}
+		}
+
+		if time.Since(startTime) > time.Duration(timeToMonitor) {
+			log.Println("Exiting after monitoring for ", timeToMonitor, " minutes")
+			return
+		} else {
+			time.Sleep(frequencyToMonitor)
+		}
 	}
 }
