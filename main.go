@@ -7,9 +7,11 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path"
+	"path/filepath"
 	"time"
 
-	"github.com/deckarep/gosx-notifier"
+	"github.com/shurcooL/trayhost"
 )
 
 const endpoint = "http://api.pugetsound.onebusaway.org"
@@ -114,10 +116,10 @@ func (a *ArrivalDepartures) String() string {
 
 func notify(a ArrivalDepartures) {
 	fmt.Println(a.String())
-	msg := gosxnotifier.NewNotification(a.String())
-	msg.Title = "Bus " + a.RouteShortName
-	msg.Group = "com.eginez.go.bus.notifier.bus" + a.RouteShortName
-	msg.Push()
+	//msg := gosxnotifier.NewNotification(a.String())
+	//msg.Title = "Bus " + a.RouteShortName
+	//msg.Group = "com.eginez.go.bus.notifier.bus" + a.RouteShortName
+	//msg.Push()
 }
 
 func searchAndNotify(apiKey, stopId, routeId string) {
@@ -127,17 +129,24 @@ func searchAndNotify(apiKey, stopId, routeId string) {
 	}
 }
 
-//Calls arrivals and departures parses the data
-//find the route in it and then printout the time
-func main() {
-	apiKey := os.Getenv("SOUND_TRANSIT_KEY")
+func makeMenu() (menus []trayhost.MenuItem) {
+	menus = []trayhost.MenuItem{
+		trayhost.MenuItem{
+			Title:   "Quit",
+			Enabled: nil,
+			Handler: func() { trayhost.Exit() },
+		},
+	}
+	return
+}
+
+func startMonitoring(apiKey string) {
 	startTime := time.Now()
 	for {
 		for k, v := range StopsToMonitor {
 			for _, r := range v {
 				fmt.Println(k, r)
 				go searchAndNotify(apiKey, k, r)
-				//	go searchAndNotify(apiKey, stopId4thAndUniv, "1_100069")
 			}
 		}
 
@@ -148,4 +157,31 @@ func main() {
 			time.Sleep(frequencyToMonitor)
 		}
 	}
+
+}
+
+func initApp() {
+	var ep string
+	var err error
+	var imgData []byte
+
+	ep, err = os.Executable()
+	if err != nil {
+		panic(err)
+	}
+
+	imgData, err = ioutil.ReadFile(path.Join(filepath.Dir(ep), "..", "Resources", "tray_icon.png"))
+	if err != nil {
+		panic(err)
+	}
+	trayhost.Initialize("GoBus", imgData, makeMenu())
+}
+
+//Calls arrivals and departures parses the data
+//find the route in it and then printout the time
+func main() {
+	apiKey := os.Getenv("SOUND_TRANSIT_KEY")
+	initApp()
+	go startMonitoring(apiKey)
+	trayhost.EnterLoop()
 }
