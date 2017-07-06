@@ -19,9 +19,12 @@ const endpoint = "http://api.pugetsound.onebusaway.org"
 const routeId316 = "1_100190"
 const routeId76 = "1_100270"
 
+const starMonitoringHour = 17
+const starMonitoringMinute = 0
+
 const stopId4thAndUniv = "1_682"
 const stopId6thAndPike = "1_1190"
-const timeToMonitor = time.Minute * 60
+const monitoringDuration = time.Minute * 60
 const frequencyToMonitor = time.Minute * 5
 
 var StopsToMonitor = map[string][]string{
@@ -116,10 +119,13 @@ func (a *ArrivalDepartures) String() string {
 
 func notify(a ArrivalDepartures) {
 	fmt.Println(a.String())
-	//msg := gosxnotifier.NewNotification(a.String())
-	//msg.Title = "Bus " + a.RouteShortName
-	//msg.Group = "com.eginez.go.bus.notifier.bus" + a.RouteShortName
-	//msg.Push()
+	notification := trayhost.Notification{
+		Title:   "Bus " + a.RouteShortName,
+		Body:    a.String(),
+		Handler: nil,
+	}
+
+	notification.Display()
 }
 
 func searchAndNotify(apiKey, stopId, routeId string) {
@@ -145,13 +151,12 @@ func startMonitoring(apiKey string) {
 	for {
 		for k, v := range StopsToMonitor {
 			for _, r := range v {
-				fmt.Println(k, r)
 				go searchAndNotify(apiKey, k, r)
 			}
 		}
 
-		if time.Since(startTime) > time.Duration(timeToMonitor) {
-			log.Println("Exiting after monitoring for ", timeToMonitor, " minutes")
+		if time.Since(startTime) > time.Duration(monitoringDuration) {
+			log.Println("Exiting after monitoring for ", monitoringDuration, " minutes")
 			return
 		} else {
 			time.Sleep(frequencyToMonitor)
@@ -175,6 +180,39 @@ func initApp() {
 		panic(err)
 	}
 	trayhost.Initialize("GoBus", imgData, makeMenu())
+
+}
+
+// Calculates the time until the first monitoring, if the desired time is within an our
+// of the runtime, it will be schedule to run ASAP, otherwise will schedule for the next day
+func CalculateDurationUntilFirstTrigger(hourOfDay int, runtime time.Time) time.Duration {
+	startTime := time.Date(runtime.Year(), runtime.Month(), runtime.Day(), hourOfDay, 0, 0, 0, runtime.Location())
+	// If the happen to be running an hour past our start time
+	if startTime.Before(runtime.Add(-1 * time.Hour)) {
+		// Set it for the next day
+		startTime = startTime.Add(24 * time.Hour)
+		return startTime.Sub(runtime)
+	}
+
+	if startTime.Before(runtime) {
+		return 0 * time.Minute
+	}
+	return startTime.Sub(runtime)
+}
+
+func monitoringLoop(apiKey string, hourOfDay, minuteOfHour int) {
+	for {
+		nextStart := CalculateDurationUntilFirstTrigger(hourOfDay, time.Now())
+		notification := trayhost.Notification{
+			Title:   "Start Bus monitoring",
+			Body:    "Will start bus monitoring in " + nextStart.String(),
+			Timeout: time.Second * 30,
+			Handler: nil,
+		}
+		notification.Display()
+		<-time.After(nextStart)
+		startMonitoring(apiKey)
+	}
 }
 
 //Calls arrivals and departures parses the data
@@ -182,6 +220,6 @@ func initApp() {
 func main() {
 	apiKey := os.Getenv("SOUND_TRANSIT_KEY")
 	initApp()
-	go startMonitoring(apiKey)
+	go monitoringLoop(apiKey, starMonitoringHour, starMonitoringMinute)
 	trayhost.EnterLoop()
 }
