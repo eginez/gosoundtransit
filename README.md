@@ -4,7 +4,7 @@ A simple go program that looks that monitors buses at stops. It uses notificatio
 ## How to install it
 
 ```bash 
-go build && mv gosoundtransit GoSoundTransit.app/Contents/MacOS
+go build && mv gosoundtransit GoSoundTransit.app/Contents/MacOS/
 ```
 
 ## How to run it
