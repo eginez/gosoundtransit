@@ -16,21 +16,7 @@ import (
 
 const endpoint = "http://api.pugetsound.onebusaway.org"
 
-const routeId316 = "1_100190"
-const routeId76 = "1_100270"
-
-const starMonitoringHour = 17
-const starMonitoringMinute = 0
-
-const stopId4thAndUniv = "1_682"
-const stopId6thAndPike = "1_1190"
-const monitoringDuration = time.Minute * 60
-const frequencyToMonitor = time.Minute * 5
-
-var StopsToMonitor = map[string][]string{
-	stopId4thAndUniv: {routeId76, routeId316},
-	stopId6thAndPike: {routeId76, routeId316},
-}
+var stopNameById map[string]string
 
 type ArrivalDepartures struct {
 	ArrivalEnabled             bool          `json:"arrivalEnabled"`
@@ -113,7 +99,8 @@ func (a *ArrivalDepartures) String() string {
 	// print print if it is predicted
 	//t := time.Unix(a.ScheduledArrivalTime/1000, 0)
 	t := time.Unix(a.ScheduledArrivalTime/1000, 0)
-	return fmt.Sprintf("For stop %v, bus %v  is comming in %0.0f mins, predicted: %v", a.StopID,
+	stopName := stopNameById[a.StopID]
+	return fmt.Sprintf("For stop %v, bus %v  is comming in %0.0f mins, predicted: %v", stopName,
 		a.RouteShortName, time.Until(t).Minutes(), a.Predicted)
 }
 
@@ -146,20 +133,20 @@ func makeMenu() (menus []trayhost.MenuItem) {
 	return
 }
 
-func startMonitoring(apiKey string) {
+func startMonitoring(apiKey string, frequencyToMonitor, monitoringDuration int, stops *[]StopInformation) {
 	startTime := time.Now()
 	for {
-		for k, v := range StopsToMonitor {
-			for _, r := range v {
-				go searchAndNotify(apiKey, k, r)
+		for _, s := range *stops {
+			for _, r := range s.Routes {
+				go searchAndNotify(apiKey, s.Id, r)
 			}
 		}
 
-		if time.Since(startTime) > time.Duration(monitoringDuration) {
+		if time.Since(startTime) > time.Minute*time.Duration(monitoringDuration) {
 			log.Println("Exiting after monitoring for ", monitoringDuration, " minutes")
 			return
 		} else {
-			time.Sleep(frequencyToMonitor)
+			time.Sleep(time.Duration(frequencyToMonitor) * time.Minute)
 		}
 	}
 
@@ -183,43 +170,27 @@ func initApp() {
 
 }
 
-// Calculates the time until the first monitoring, if the desired time is within an our
-// of the runtime, it will be schedule to run ASAP, otherwise will schedule for the next day
-func CalculateDurationUntilFirstTrigger(hourOfDay int, runtime time.Time) time.Duration {
-	startTime := time.Date(runtime.Year(), runtime.Month(), runtime.Day(), hourOfDay, 0, 0, 0, runtime.Location())
-	// If the happen to be running an hour past our start time
-	if startTime.Before(runtime.Add(-1 * time.Hour)) {
-		// Set it for the next day
-		startTime = startTime.Add(24 * time.Hour)
-		return startTime.Sub(runtime)
+func monitoringLoop(apiKey string, hourOfDay, minuteOfHour int, configuration GoTransitConf) {
+	notification := trayhost.Notification{
+		Title:   "Start Bus monitoring",
+		Body:    "",
+		Timeout: time.Second * 30,
+		Handler: nil,
 	}
-
-	if startTime.Before(runtime) {
-		return 0 * time.Minute
-	}
-	return startTime.Sub(runtime)
-}
-
-func monitoringLoop(apiKey string, hourOfDay, minuteOfHour int) {
-	for {
-		nextStart := CalculateDurationUntilFirstTrigger(hourOfDay, time.Now())
-		notification := trayhost.Notification{
-			Title:   "Start Bus monitoring",
-			Body:    "Will start bus monitoring in " + nextStart.String(),
-			Timeout: time.Second * 30,
-			Handler: nil,
-		}
-		notification.Display()
-		<-time.After(nextStart)
-		startMonitoring(apiKey)
-	}
+	notification.Display()
+	startMonitoring(apiKey, configuration.FrequencyToMonitor, configuration.MonitorDuration, &configuration.StopsToMonitor)
 }
 
 //Calls arrivals and departures parses the data
 //find the route in it and then printout the time
 func main() {
-	apiKey := os.Getenv("SOUND_TRANSIT_KEY")
+
+	configuration, err := ReadConfiguration()
+	if err != nil {
+		log.Println("error:", err)
+	}
 	initApp()
-	go monitoringLoop(apiKey, starMonitoringHour, starMonitoringMinute)
+	stopNameById = StopIdToName(configuration.StopsToMonitor)
+	go monitoringLoop(configuration.ApiKey, configuration.StartMonitoringHour, configuration.StartMonitoringMinute, configuration)
 	trayhost.EnterLoop()
 }
