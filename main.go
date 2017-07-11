@@ -145,9 +145,8 @@ func startMonitoring(apiKey string, frequencyToMonitor, monitoringDuration int, 
 		if time.Since(startTime) > time.Minute*time.Duration(monitoringDuration) {
 			log.Println("Exiting after monitoring for ", monitoringDuration, " minutes")
 			return
-		} else {
-			time.Sleep(time.Duration(frequencyToMonitor) * time.Minute)
 		}
+		time.Sleep(time.Duration(frequencyToMonitor) * time.Minute)
 	}
 
 }
@@ -179,6 +178,7 @@ func monitoringLoop(apiKey string, hourOfDay, minuteOfHour int, configuration Go
 	}
 	notification.Display()
 	startMonitoring(apiKey, configuration.FrequencyToMonitor, configuration.MonitorDuration, &configuration.StopsToMonitor)
+	trayhost.Exit()
 }
 
 //Calls arrivals and departures parses the data
