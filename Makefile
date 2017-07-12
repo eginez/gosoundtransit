@@ -23,3 +23,6 @@ delete-launchdfile:
 
 delete-cron:
 	crontab -r
+
+clean:
+	rm cronfile cron-gosoundtransit.plist gosoundtransit
