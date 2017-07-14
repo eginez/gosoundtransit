@@ -32,7 +32,8 @@ make install-launchdfile
     "monitorDuration": 60,
     "startMonitoringHour": 21,
     "startMonitoringMinute": 0
-}```
+}
+```
 
 
 
