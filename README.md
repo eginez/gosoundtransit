@@ -9,7 +9,7 @@ go build && mv gosoundtransit GoSoundTransit.app/Contents/MacOS/
 
 ## How to run it
 ```bash
-SOUND_TRANSIT_KEY=[key] open GoSoundTransit.app
+make install-launchdfile
 ```
 
 
