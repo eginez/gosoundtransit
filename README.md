@@ -11,7 +11,28 @@ go build && mv gosoundtransit GoSoundTransit.app/Contents/MacOS/
 ```bash
 make install-launchdfile
 ```
+## Example of a configuration file
+```json
+{
+    "pudgetSoundApiKey":"",
+    "stopsToMonitor":[
+        {
+            "stopId":"1_682",
+            "name": "4th and University",
+            "routes":["1_100190", "1_100270"]
+        },
+        {
+            "stopId":"1_1190",
+            "name": "6th and Pike",
+            "routes":["1_100190", "1_100270"]
+        }
 
+    ],
+    "frequencyToMonitor": 5,
+    "monitorDuration": 60,
+    "startMonitoringHour": 21,
+    "startMonitoringMinute": 0
+}```
 
 
 
